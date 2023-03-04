@@ -1,3 +1,8 @@
+# augmented_lagrangize.py
+# penalty_method.py
+# quadratic_penalty.py
+
+
 import scores
 import models
 import torch

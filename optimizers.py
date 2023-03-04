@@ -1,5 +1,8 @@
-# adam
+# adam.py
 
 
 
-# lgfbs
+# lgfbs.py
+
+
+#gradient_decent.py
