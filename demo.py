@@ -31,3 +31,15 @@ if __name__ == '__main__':
     acc = utils.count_accuracy(B_true, W_est != 0)
     print(f'runtime: {tend-tstart}')
     print(acc)
+
+
+
+
+
+# in the demo.py
+model = mlp_signed(hyperparams)
+h_func = notears(model,hyperparams)
+score = mse_loss(data, model,hyperparams) 
+optimizer = adam(hyperparams) # how to solve each unconstrained problem
+
+W_est  = fit.augmented_lagrangian(model, score, h_func, optimizer)

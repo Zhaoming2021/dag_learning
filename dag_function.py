@@ -9,6 +9,7 @@ import scipy.linalg as sla
 import numpy.linalg as la
 from trace_expm import trace_expm
 
+
 class dag_functions:
     def __init__(self, model, X, W, dims, s=1.0):
         self.model = model
