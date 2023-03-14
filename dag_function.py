@@ -4,9 +4,6 @@
 import torch
 import torch.nn as nn
 import numpy as np
-import scipy.linalg as slin
-import scipy.linalg as sla
-import numpy.linalg as la
 from trace_expm import trace_expm
 
 

@@ -89,7 +89,8 @@ def minimize(model, X, max_iter, lr, lambda1, lambda2, mu, s, lr_decay=False, ch
     obj_prev = 1e16
     for i in range(max_iter):
         optimizer.zero_grad()
-        h_val = model.h_func(s)
+        #h_val = model.h_func(s)
+        h_val = dag_function.h(model, X, s=1.0)
         if h_val.item() < 0:
             vprint(f'Found h negative {h_val.item()} at iter {i}')
             return False
@@ -112,7 +113,7 @@ def minimize(model, X, max_iter, lr, lambda1, lambda2, mu, s, lr_decay=False, ch
             obj_prev = obj_new
         pbar.update(1)
     return True
-       
+
 def dagma_nonlinear(
         model: nn.Module, X: torch.tensor, lambda1=.02, lambda2=.005,
         T=4, mu_init=.1, mu_factor=.1, s=1.0,

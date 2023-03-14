@@ -9,12 +9,13 @@ from tqdm.auto import tqdm
 
 class mlp_signed(nn.Module):
     # dagma nolinear
-    def __init__(self, dims, bias=True):
+    def __init__(self, dims, bias=True, dtype=np.float64):
         super(mlp_signed, self).__init__()
         assert len(dims) >= 2
         assert dims[-1] == 1
         self.dims, self.d = dims, dims[0]
         self.I = torch.eye(self.d)
+        self.dtype = dtype
         self.Id = np.eye(self.d).astype(self.dtype)
         self.fc1 = nn.Linear(self.d, self.d * dims[1], bias=bias)
         nn.init.zeros_(self.fc1.weight)

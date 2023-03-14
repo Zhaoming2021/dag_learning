@@ -22,14 +22,20 @@ X = utils.simulate_nonlinear_sem(B_true, n, sem_type)
 
 # in the demo.py
 model = models.mlp_signed(dims=[d, 10, 1], bias=True)
-h_func = dag_function.dag_functions(model, X, dims = [d, 10, 1], s=1.0)
-X_hat = model(X)
-loss_fn = scores.LossFunction()
-score = loss_fn.log_mse_loss(X_hat, X) 
-# optimizer = optim.adam(model.parameters(), lr=lr, betas=(.99,.999), weight_decay=mu*lambda2) # how to solve each unconstrained problem
+W = model.fc1_to_adj()
+#h_func = dag_function.h(model,W, X, dims = [d, 10, 1], s=1.0)
+#h_func = dag_function.h(s)
 
 X_torch = torch.from_numpy(X)
-W_est = algorithms.dagma_nonlinear(model,score, h_func, X_torch, lambda1=0.02, lambda2=0.005)
+X_hat = model(X_torch)
+loss_fn = scores.LossFunction()
+#print(X_hat.type)
+score = loss_fn.log_mse_loss(X_hat, X_torch) 
+# optimizer = optim.adam(model.parameters(), lr=lr, betas=(.99,.999), weight_decay=mu*lambda2) # how to solve each unconstrained problem
+
+
+#W_est = algorithms.dagma_nonlinear(model, score, h_func, X_torch, lambda1=0.02, lambda2=0.005)
+W_est = algorithms.dagma_nonlinear(model, X_torch, lambda1=0.02, lambda2=0.005)
 #W_est  = algorithms.fit(model, score, h_func, optimizer)
 assert utils.is_dag(W_est)
 np.savetxt('W_est.csv', W_est, delimiter=',')
