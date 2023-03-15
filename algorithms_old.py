@@ -9,6 +9,8 @@ from  torch import optim
 import copy
 import scores
 import models
+import scipy.linalg as sla
+import numpy.linalg as la
 import scipy.optimize as sopt
 import dag_function
 from lbfgsb_scipy import LBFGSBScipy
@@ -161,7 +163,7 @@ def dual_ascent_step(model, X, lambda1, lambda2, rho, alpha, h, rho_max):
         def closure():
             optimizer.zero_grad()
             X_hat = model(X_torch)
-            loss = scores.squared_loss(X_hat, X_torch)
+            loss = scores.squared_loss(X_hat, X_torch)  #   puzzle me 
             h_val = model.h_func()
             penalty = 0.5 * rho * h_val * h_val + alpha * h_val
             l2_reg = 0.5 * lambda2 * model.l2_reg()
@@ -198,6 +200,53 @@ def notears_nonlinear(model: nn.Module,
     W_est[np.abs(W_est) < w_threshold] = 0
     return W_est
 
+
+
+def minimize_unsigned(self, W, mu, max_iter, s, lr, tol=1e-6, beta_1=0.99, beta_2=0.999, pbar=None):
+        obj_prev = 1e16
+        self.opt_m, self.opt_v = 0, 0
+        self.vprint(f'\n\nMinimize with -- mu:{mu} -- lr: {lr} -- s: {s} -- l1: {self.lambda1} for {max_iter} max iterations')
+        
+        for iter in range(1, max_iter+1):
+            ## Compute the (sub)gradient of the objective
+            M = sla.inv(s * self.Id - W * W) + 1e-16
+            while np.any(M < 0): # sI - W o W is not an M-matrix
+                if iter == 1 or s <= 0.9:
+                    self.vprint(f'W went out of domain for s={s} at iteration {iter}')
+                    return W, False
+                else:
+                    W += lr * grad
+                    lr *= .5
+                    if lr <= 1e-16:
+                        return W, True
+                    W -= lr * grad
+                    M = sla.inv(s * self.Id - W * W) + 1e-16
+                    self.vprint(f'Learning rate decreased to lr: {lr}')
+            
+            if self.loss_type == 'l2':
+                G_score = -mu * self.cov @ (self.Id - W) 
+            elif self.loss_type == 'logistic':
+                G_score = mu / self.n * self.X.T @ sigmoid(self.X @ W) - mu * self.cov
+            Gobj = G_score + mu * self.lambda1 * np.sign(W) + 2 * W * M.T
+            
+            ## Adam step
+            grad = self._adam_update(Gobj, iter, beta_1, beta_2)
+            W -= lr * grad
+            
+            ## Check obj convergence
+            if iter % self.checkpoint == 0 or iter == max_iter:
+                obj_new, score, h = self._func(W, mu, s)
+                self.vprint(f'\nInner iteration {iter}')
+                self.vprint(f'\th(W_est): {h:.4e}')
+                self.vprint(f'\tscore(W_est): {score:.4e}')
+                self.vprint(f'\tobj(W_est): {obj_new:.4e}')
+                if np.abs((obj_prev - obj_new) / obj_prev) <= tol:
+                    pbar.update(max_iter-iter+1)
+                    break
+                obj_prev = obj_new
+            pbar.update(1)
+        return W, True
+
 def fit(X, lambda1, w_threshold=0.3, T=5,
             mu_init=1.0, mu_factor=0.1, s=[1.0, .9, .8, .7, .6], 
             warm_iter=3e4, max_iter=6e4, lr=0.0003, 
@@ -231,7 +280,7 @@ def fit(X, lambda1, w_threshold=0.3, T=5,
                 lr_adam, success = lr, False
                 inner_iters = int(max_iter) if i == T - 1 else int(warm_iter)
                 while success is False:
-                    W_temp, success = minimize(W_est.copy(), mu, inner_iters, s[i], lr=lr_adam, beta_1=beta_1, beta_2=beta_2, pbar=pbar)
+                    W_temp, success = minimize_unsigned(W_est.copy(), mu, inner_iters, s[i], lr=lr_adam, beta_1=beta_1, beta_2=beta_2, pbar=pbar)
                     if success is False:
                         vprint(f'Retrying with larger s')
                         lr_adam *= 0.5
