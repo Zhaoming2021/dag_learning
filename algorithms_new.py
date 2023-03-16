@@ -99,9 +99,7 @@ class dagma_algo:
 
 
     def _algo(self, model: nn.Module,X: torch.tensor, lambda1=.02, lambda2=.005,beta_1=0.99, beta_2=0.999,
-        T=4, mu_init=.1, mu_factor=.1, s=1.0,
-        warm_iter=5e4, max_iter=8e4, lr=.0002, 
-        w_threshold=0.3, checkpoint=1000, verbose=False,h_func=None):
+        T=4, mu_init=.1, mu_factor=.1, s=1.0, warm_iter=5e4, max_iter=8e4, lr=.0002, w_threshold=0.3, checkpoint=1000, verbose=False, h_func=None):
 
         if self.model.type == "mlp_signed":
             
