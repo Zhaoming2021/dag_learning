@@ -11,10 +11,11 @@ from lbfgsb_scipy import LBFGSBScipy
 
 
 class dagma_algo:
-    def __init__(self, model, h_func, score,loss_type):
+    def __init__(self, model, h_func, score, model_type, loss_type):
         self.model = model
         self.h_func = h_func
         self.score = score
+        self.model_type = model_type
         self.loss_type = loss_type
 
     def minimize(self, model, X, max_iter, lr, lambda1, lambda2, mu, s, lr_decay=False, checkpoint=1000, tol=1e-6, verbose=False, pbar=None):
@@ -98,10 +99,10 @@ class dagma_algo:
         return W, True
 
 
-    def _algo(self, model: nn.Module,X: torch.tensor, lambda1=.02, lambda2=.005,beta_1=0.99, beta_2=0.999,
-        T=4, mu_init=.1, mu_factor=.1, s=1.0, warm_iter=5e4, max_iter=8e4, lr=.0002, w_threshold=0.3, checkpoint=1000, verbose=False, h_func=None):
+    def _algo(self, model: nn.Module, X: torch.tensor, lambda1=.02, lambda2=.005, beta_1=0.99, beta_2=0.999,
+        T=4, mu_init=.1, mu_factor=.1, s=1.0, warm_iter=5e4, max_iter=8e4, lr=.0002, w_threshold=0.3, checkpoint=1000, verbose=False):
 
-        if self.model.type == "mlp_signed":
+        if self.model_type == "mlp_signed":
             
             vprint = print if verbose else lambda *a, **k: None
             mu = mu_init
@@ -122,7 +123,7 @@ class dagma_algo:
                     lr_decay = False
                     while success is False:
                         success = self.minimize(model, X, inner_iter, lr, lambda1, lambda2, mu, s_cur, 
-                                            lr_decay, checkpoint=checkpoint, h_func=h_func, verbose=verbose, pbar=pbar)
+                                            lr_decay, checkpoint=checkpoint, verbose=verbose, pbar=pbar)
                         if success is False:
                             model.load_state_dict(model_copy.state_dict().copy())
                             lr *= 0.5 
@@ -135,7 +136,7 @@ class dagma_algo:
             W_est[np.abs(W_est) < w_threshold] = 0
             return W_est
 
-        if self.model.type == "linear_signed":
+        if self.model_type == "linear_signed":
             X, lambda1, checkpoint = X, lambda1, checkpoint
             n, d = X.shape
             self.Id = np.eye(d).astype(np.float64)
@@ -181,10 +182,11 @@ class dagma_algo:
 
 
 class notears_algo:
-    def __init__(self, model,h_func,score,loss_type):
+    def __init__(self, model,h_func,score, model_type, loss_type):
         self.model = model
         self.h_func = h_func
         self.score = score
+        self.model_type = model_type
         self.loss_type = loss_type
 
     def dual_ascent_step(self, model, X, lambda1, lambda2, rho, alpha, h, rho_max):
@@ -219,7 +221,7 @@ class notears_algo:
 
     def _algo(self, model, X: np.ndarray,lambda1: float = 0.,lambda2: float = 0.,loss_type='l2', max_iter: int = 100,h_tol: float = 1e-8,rho_max: float = 1e+16,
 w_threshold: float = 0.3):
-        if self.model.type == "mlp_unsigned":
+        if self.model_type == "mlp_unsigned":
             rho, alpha, h = 1.0, 0.0, np.inf
             for _ in range(max_iter):
                 rho, alpha, h = self.dual_ascent_step(model, X, lambda1, lambda2,
@@ -231,7 +233,7 @@ w_threshold: float = 0.3):
             return W_est
 
 
-        if self.model.type == "linear_unsigned":
+        if self.model_type == "linear_unsigned":
             n, d = X.shape
             w_est, rho, alpha, h = np.zeros(2 * d * d), 1.0, 0.0, np.inf  # double w_est into (w_pos, w_neg)
             bnds = [(0, 0) if i == j else (0, None) for _ in range(2) for i in range(d) for j in range(d)]
