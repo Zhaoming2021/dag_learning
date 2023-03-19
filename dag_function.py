@@ -1,29 +1,35 @@
 import torch
 import numpy as np
+import torch.nn as nn
 
 
 class nonlinear:
-  def __init__(self,model,model_type,dims):
+  def __init__(self,model, model_type, dims):
     self.model = model
     self.model_type = model_type
     self.dims, self.d = dims, dims[0]
     self.I = torch.eye(self.d)
+    #self.fc1 = nn.Linear(self.d, self.d * dims[1], bias=bias)
+    #self.fc1_pos = nn.Linear(self.d, self.d * dims[1], bias=bias)
+    #self.fc1_neg = nn.Linear(self.d, self.d * dims[1], bias=bias)
+    self.k = dims[-1]
 
   def eval(self, s=1.0):
     if self.model_type == "mlp_signed":
-      fc1_weight = self.model.fc1.weight
+      fc1_weight = self.model.fc1.weight # not sure can call fc1.weight in this way
       fc1_weight = fc1_weight.view(self.d, -1, self.d)
       A = torch.sum(fc1_weight ** 2, dim=1).t()  # [i, j]
       h = -torch.slogdet(s * self.I - A)[1] + self.d * np.log(s)
       #h = -torch.slogdet(s * torch.eye(self.model.d) - A)[1] + self.model.d * torch.log(s)
       return h
 
-
     if self.model_type == "mlp_unsigned":
-      fc1_weight = self.model.fc1_pos.weight - self.model.fc1_neg.weight  # [j, ik]
-      fc1_weight = fc1_weight.view(self.model.d, self.model.d, self.model.k)  # [j, i, k]
-      A = torch.sum(fc1_weight * fc1_weight, dim=2).t()  # [i, j]
-      h = torch.trace(torch.matrix_exp(A)) - self.model.d
+      fc1_weight = self.fc1_pos.weight - self.fc1_neg.weight  # [j, ik]
+      fc1_weight = fc1_weight.view(self.d, -1, self.d)  # [j, i, k]
+      #fc1_weight = fc1_weight.view(d, -1, d)  # [j, m1, i]
+      A = torch.sum(fc1_weight * fc1_weight, dim=1).t()  # [i, j]
+      #A = torch.sum(fc1_weight * fc1_weight, dim=2).t()  # [i, j]
+      h = torch.trace(torch.matrix_exp(A)) - self.d
       return h 
     
 class linear:

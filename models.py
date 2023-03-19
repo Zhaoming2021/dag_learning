@@ -8,7 +8,7 @@ import scores
 from tqdm.auto import tqdm
 
 class mlp_signed(nn.Module):
-    # dagma nolinear
+    # dagma nonlinear
     def __init__(self, dims, bias=True, dtype=np.float64):
         super(mlp_signed, self).__init__()
         assert len(dims) >= 2

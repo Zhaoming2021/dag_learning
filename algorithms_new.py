@@ -4,6 +4,7 @@ import numpy as np
 from tqdm.auto import tqdm
 from  torch import optim
 import copy
+#import scores
 from scipy.special import expit as sigmoid
 import scipy.linalg as sla
 import scipy.optimize as sopt
@@ -11,7 +12,7 @@ from lbfgsb_scipy import LBFGSBScipy
 
 
 class dagma_algo:
-    def __init__(self, model, h_func, score, model_type, loss_type):
+    def __init__(self, model, h_func,score, model_type, loss_type):
         self.model = model
         self.h_func = h_func
         self.score = score
@@ -33,11 +34,13 @@ class dagma_algo:
                 vprint(f'Found h negative {h_val.item()} at iter {i}')
                 return False
             #X_hat = model(X)
-            #score = scores.log_mse_loss(X_hat, X)
+            #loss_fn = scores.LossFunction()
+            #score = loss_fn.log_mse_loss(X_hat, X)
             score = self.score
             l1_reg = lambda1 * model.fc1_l1_reg()
             obj = mu * (score + l1_reg) + h_val
             obj.backward()
+            #obj.backward(retain_graph=True)
             optimizer.step()
             if lr_decay and (i+1) % 1000 == 0: #every 1000 iters reduce lr
                 scheduler.step()
@@ -132,6 +135,7 @@ class dagma_algo:
                                 break # lr is too small
                             s_cur = 1
                     mu *= mu_factor
+            #W_est = self.model.fc1_to_adj()
             W_est = model.fc1_to_adj()
             W_est[np.abs(W_est) < w_threshold] = 0
             return W_est
