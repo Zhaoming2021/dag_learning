@@ -2,21 +2,17 @@ from locally_connected import LocallyConnected
 import torch
 import torch.nn as nn
 import numpy as np
-from  torch import optim
-import dag_function
-import scores
-from tqdm.auto import tqdm
 
 class mlp_signed(nn.Module):
     # dagma nonlinear
-    def __init__(self, dims, bias=True, dtype=np.float64):
+    def __init__(self, dims, bias=True, dtype=torch.float64):
         super(mlp_signed, self).__init__()
         assert len(dims) >= 2
         assert dims[-1] == 1
         self.dims, self.d = dims, dims[0]
         self.I = torch.eye(self.d)
         self.dtype = dtype
-        self.Id = np.eye(self.d).astype(self.dtype)
+        #self.Id = np.eye(self.d).astype(self.dtype)
         self.fc1 = nn.Linear(self.d, self.d * dims[1], bias=bias)
         nn.init.zeros_(self.fc1.weight)
         nn.init.zeros_(self.fc1.bias)
@@ -49,31 +45,36 @@ class mlp_signed(nn.Module):
         W = W.cpu().detach().numpy()  # [i, j]
         return W
     
+""" 
 class linear_signed:
     # dagma linear
-    def __init__(self, loss_type, verbose=False, dtype=np.float64):
+    def __init__(self, d, verbose=False,s = 1.0, dtype=torch.double):
         super().__init__()
-        losses = ['l2', 'logistic']
-        assert loss_type in losses, f"loss_type should be one of {losses}"
-        self.loss_type = loss_type
         self.dtype = dtype
+        self.s = s
+        self.d = d
         self.vprint = print if verbose else lambda *a, **k: None
+        self.Id = torch.eye(self.d).astype(self.dtype)
+        self.W = torch.zeros((self.d,self.d)).astype(self.dtype) # init W0 at zero matrix
 
-    def _func(self, W, mu, s=1.0):
-        """Evaluate value of the penalized objective function."""
-        loss_fn = scores.LossFunction()
-        score, _ = loss_fn.linear_loss(W)
-        h, _ = dag_function.h(W, s)
-        obj = mu * (score + self.lambda1 * np.abs(W).sum()) + h 
-        return obj, score, h
-    
     def _adam_update(self, grad, iter, beta_1, beta_2):
         self.opt_m = self.opt_m * beta_1 + (1 - beta_1) * grad
         self.opt_v = self.opt_v * beta_2 + (1 - beta_2) * (grad ** 2)
         m_hat = self.opt_m / (1 - beta_1 ** iter)
         v_hat = self.opt_v / (1 - beta_2 ** iter)
         grad = m_hat / (np.sqrt(v_hat) + 1e-8)
+
         return grad
+    def adj(self):
+        M = torch.linalg.inv(self.s * self.Id - self.W * self.W) + 1e-16
+        Gobj = G_score + mu * self.lambda1 * torch.sign(W) + 2 * W * M.T
+        ## Adam step
+        grad = self._adam_update(Gobj, iter, self.beta_1, self.beta_2)
+        W -= lr * grad    
+        #W = torch.from_numpy(W)
+        return W 
+"""
+
     
 class mlp_unsigned(nn.Module):
     # notears nolinear
@@ -81,17 +82,17 @@ class mlp_unsigned(nn.Module):
         super(mlp_unsigned, self).__init__()
         assert len(dims) >= 2
         assert dims[-1] == 1
-        d = dims[0]
+        self.d = dims[0]
         self.dims = dims
         # fc1: variable splitting for l1
-        self.fc1_pos = nn.Linear(d, d * dims[1], bias=bias)
-        self.fc1_neg = nn.Linear(d, d * dims[1], bias=bias)
+        self.fc1_pos = nn.Linear(self.d, self.d * dims[1], bias=bias)
+        self.fc1_neg = nn.Linear(self.d, self.d * dims[1], bias=bias)
         self.fc1_pos.weight.bounds = self._bounds()
         self.fc1_neg.weight.bounds = self._bounds()
         # fc2: local linear layers
         layers = []
         for l in range(len(dims) - 2):
-            layers.append(LocallyConnected(d, dims[l + 1], dims[l + 2], bias=bias))
+            layers.append(LocallyConnected(self.d, dims[l + 1], dims[l + 2], bias=bias))
         self.fc2 = nn.ModuleList(layers)
 
     def _bounds(self):
@@ -144,28 +145,30 @@ class mlp_unsigned(nn.Module):
 
 class linear_unsigned:
 
-    def __init__(self, loss_type, verbose=False, dtype=np.float64, lambda1=0.0, rho=1.0, alpha=1.0):
+    def __init__(self, d, verbose=False, dtype=torch.double):
         super().__init__()
-        losses = ['l2', 'logistic']
-        assert loss_type in losses, f"loss_type should be one of {losses}"
-        self.loss_type = loss_type
         self.dtype = dtype
-        self.lambda1 = lambda1
-        self.rho = rho
-        self.alpha = alpha
+        self.d = d
         self.vprint = print if verbose else lambda *a, **k: None
+        #self.w = np.zeros(2 * d * d)
+        self.w = torch.zeros(2 * d * d)
+        #self.W = torch.zeros((d,d))
 
-    def _adj(self,w):
+    def _adj(self):
         """Convert doubled variables ([2 d^2] array) back to original variables ([d, d] matrix)."""
-        return (w[:self.d * self.d] - w[self.d * self.d:]).reshape([self.d, self.d])
+        return (self.w[:self.d * self.d] - self.w[self.d * self.d:]).reshape([self.d, self.d])
 
-    def _func(self,w):
-        """Evaluate value and gradient of augmented Lagrangian for doubled variables ([2 d^2] array)."""
-        W = self._adj(w)
-        loss_fn = scores.LossFunction()
-        loss, G_loss = loss_fn.linear_loss(W)
-        h, G_h = dag_function._h(W)
-        obj = loss + 0.5 * self.rho * h * h + self.alpha * h + self.lambda1 * w.sum()
-        G_smooth = G_loss + (self.rho * h + self.alpha) * G_h
-        g_obj = np.concatenate((G_smooth + self.lambda1, - G_smooth + self.lambda1), axis=None)
-        return obj, g_obj
+    def adj(self):
+        W = self._adj()
+        #W = torch.from_numpy(W)
+        return W
+    
+""" 
+model = linear_signed(d=10)
+model.W = 
+model.adj() # this will be the adj
+
+model = nonlinear(d=10)
+model.fc1_to_adj
+model.adj() # 
+"""

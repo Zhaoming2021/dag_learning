@@ -14,6 +14,31 @@ class LossFunction:
         loss = 0.5 * d * torch.log(1 / n * torch.sum((output - target) ** 2))
         return loss
     
+    def logistic_loss(self, output, target):
+        #X_tensor = torch.tensor(X, dtype=torch.double)
+        #W_tensor = torch.tensor(W, dtype=torch.double, requires_grad=True)
+        #M = target @ output
+        #loss = 1.0 / target.shape[0] * (torch.logaddexp(torch.tensor(0.), M) - target * M).sum()
+        loss = 1.0 / output.shape[0] * (torch.logaddexp(torch.tensor(0.), target) - target * output).sum()
+        # Compute the gradients
+        #G_loss = loss.backward()
+        return loss
+    
+    def poisson_loss(self, output, target):
+        #M = target @ output
+        S = torch.exp(target)
+        loss = 1.0 / output.shape[0] * (S - output * target).sum()
+        # Compute the gradients
+        #G_loss = loss.backward()
+        return loss
+    """  
+    def poisson_loss(self, output, target):
+        M = target @ output
+        S = torch.exp(M)
+        loss = 1.0 / target.shape[0] * (S - target * M).sum()
+        loss.backward()
+        return loss
+    
     def linear_loss(self, W, X, loss_type):
         X_tensor = torch.tensor(X, dtype=torch.double)
         W_tensor = torch.tensor(W, dtype=torch.double, requires_grad=True)
@@ -31,6 +56,7 @@ class LossFunction:
         loss.backward()
         G_loss = W_tensor.grad.detach().numpy()
         return loss.detach().numpy(), G_loss
+    """
 def main():
     loss_fn = LossFunction()
     output = torch.tensor([[1, 2, 3],[2, 4, 6]], dtype=torch.double)
