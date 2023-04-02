@@ -7,12 +7,13 @@ class mlp_signed(nn.Module):
     # dagma nonlinear
     def __init__(self, dims, bias=True, dtype=torch.float64):
         super(mlp_signed, self).__init__()
+        torch.set_default_dtype(torch.double)
         assert len(dims) >= 2
         assert dims[-1] == 1
         self.dims, self.d = dims, dims[0]
-        self.I = torch.eye(self.d)
+        self.I = torch.eye(self.d,dtype=torch.float)
         self.dtype = dtype
-        #self.Id = np.eye(self.d).astype(self.dtype)
+        self.Id = np.eye(self.d).astype(self.dtype)
         self.fc1 = nn.Linear(self.d, self.d * dims[1], bias=bias)
         nn.init.zeros_(self.fc1.weight)
         nn.init.zeros_(self.fc1.bias)
@@ -36,7 +37,7 @@ class mlp_signed(nn.Module):
         return torch.sum(torch.abs(self.fc1.weight))
 
     @torch.no_grad()
-    def fc1_to_adj(self) -> np.ndarray:  # [j * m1, i] -> [i, j]
+    def adj(self) -> np.ndarray:  # [j * m1, i] -> [i, j]
         """Get W from fc1 weights, take 2-norm over m1 dim"""
         fc1_weight = self.fc1.weight
         fc1_weight = fc1_weight.view(self.d, -1, self.d)  
@@ -44,42 +45,30 @@ class mlp_signed(nn.Module):
         W = torch.sqrt(A)
         W = W.cpu().detach().numpy()  # [i, j]
         return W
-    
-""" 
+
+
+# puzzled in linear_signed :W
 class linear_signed:
-    # dagma linear
-    def __init__(self, d, verbose=False,s = 1.0, dtype=torch.double):
+    def __init__(self, d, verbose=False, dtype=torch.double):
         super().__init__()
+        torch.set_default_dtype(torch.double)
         self.dtype = dtype
-        self.s = s
         self.d = d
         self.vprint = print if verbose else lambda *a, **k: None
-        self.Id = torch.eye(self.d).astype(self.dtype)
-        self.W = torch.zeros((self.d,self.d)).astype(self.dtype) # init W0 at zero matrix
+        self.W = torch.zeros((d,d))
+        #self.W = np.zeros((self.d,self.d)).astype(self.dtype)
 
-    def _adam_update(self, grad, iter, beta_1, beta_2):
-        self.opt_m = self.opt_m * beta_1 + (1 - beta_1) * grad
-        self.opt_v = self.opt_v * beta_2 + (1 - beta_2) * (grad ** 2)
-        m_hat = self.opt_m / (1 - beta_1 ** iter)
-        v_hat = self.opt_v / (1 - beta_2 ** iter)
-        grad = m_hat / (np.sqrt(v_hat) + 1e-8)
-
-        return grad
     def adj(self):
-        M = torch.linalg.inv(self.s * self.Id - self.W * self.W) + 1e-16
-        Gobj = G_score + mu * self.lambda1 * torch.sign(W) + 2 * W * M.T
-        ## Adam step
-        grad = self._adam_update(Gobj, iter, self.beta_1, self.beta_2)
-        W -= lr * grad    
-        #W = torch.from_numpy(W)
-        return W 
-"""
 
-    
+        self.W = self.W
+
+        return self.W 
+  
 class mlp_unsigned(nn.Module):
     # notears nolinear
     def __init__(self, dims, bias=True):
         super(mlp_unsigned, self).__init__()
+        torch.set_default_dtype(torch.double)
         assert len(dims) >= 2
         assert dims[-1] == 1
         self.d = dims[0]
@@ -132,7 +121,7 @@ class mlp_unsigned(nn.Module):
         return reg
 
     @torch.no_grad()
-    def fc1_to_adj(self) -> np.ndarray:  # [j * m1, i] -> [i, j]
+    def adj(self) -> np.ndarray:  # [j * m1, i] -> [i, j]
         """Get W from fc1 weights, take 2-norm over m1 dim"""
         d = self.dims[0]
         fc1_weight = self.fc1_pos.weight - self.fc1_neg.weight  # [j * m1, i]
@@ -150,18 +139,11 @@ class linear_unsigned:
         self.dtype = dtype
         self.d = d
         self.vprint = print if verbose else lambda *a, **k: None
-        #self.w = np.zeros(2 * d * d)
         self.w = torch.zeros(2 * d * d)
-        #self.W = torch.zeros((d,d))
-
-    def _adj(self):
-        """Convert doubled variables ([2 d^2] array) back to original variables ([d, d] matrix)."""
-        return (self.w[:self.d * self.d] - self.w[self.d * self.d:]).reshape([self.d, self.d])
 
     def adj(self):
-        W = self._adj()
-        #W = torch.from_numpy(W)
-        return W
+        """Convert doubled variables ([2 d^2] array) back to original variables ([d, d] matrix)."""
+        return (self.w[:self.d * self.d] - self.w[self.d * self.d:]).reshape([self.d, self.d])
     
 """ 
 model = linear_signed(d=10)
