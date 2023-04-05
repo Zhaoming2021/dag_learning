@@ -13,7 +13,7 @@ class mlp_signed(nn.Module):
         self.dims, self.d = dims, dims[0]
         self.I = torch.eye(self.d,dtype=torch.float)
         self.dtype = dtype
-        self.Id = np.eye(self.d).astype(self.dtype)
+        #self.Id = torch.eye(self.d, dtype=torch.float)
         self.fc1 = nn.Linear(self.d, self.d * dims[1], bias=bias)
         nn.init.zeros_(self.fc1.weight)
         nn.init.zeros_(self.fc1.bias)
@@ -35,6 +35,10 @@ class mlp_signed(nn.Module):
     def fc1_l1_reg(self):
         """Take l1 norm of fc1 weight"""
         return torch.sum(torch.abs(self.fc1.weight))
+    
+    def fc1_l2_reg(self):
+        """Take l2 norm of fc1 weight"""
+        return torch.sqrt(torch.sum(torch.pow(self.fc1.weight, 2)))
 
     @torch.no_grad()
     def adj(self) -> np.ndarray:  # [j * m1, i] -> [i, j]
@@ -47,7 +51,6 @@ class mlp_signed(nn.Module):
         return W
 
 
-# puzzled in linear_signed :W
 class linear_signed:
     def __init__(self, d, verbose=False, dtype=torch.double):
         super().__init__()
@@ -119,6 +122,10 @@ class mlp_unsigned(nn.Module):
         """Take l1 norm of fc1 weight"""
         reg = torch.sum(self.fc1_pos.weight + self.fc1_neg.weight)
         return reg
+    
+    def fc1_l2_reg(self):
+        """Take l2 norm of fc1 weight"""
+        return torch.sqrt(torch.sum(torch.pow(self.fc1.weight, 2)))
 
     @torch.no_grad()
     def adj(self) -> np.ndarray:  # [j * m1, i] -> [i, j]
