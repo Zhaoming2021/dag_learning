@@ -7,6 +7,7 @@ import numpy as np
 from  torch import optim
 import scipy.linalg as sla
 import copy
+import torch
 
 class PenaltyMethod:
 
@@ -23,6 +24,8 @@ class PenaltyMethod:
 
         ## INITALIZING VARIABLES 
         self.vprint = print if verbose else lambda *a, **k: None
+        self.n, self.d = X.shape
+        self.Id = torch.eye(self.d, dtype=torch.float)
         mu = mu_init
 
         if type(s) == list:
@@ -34,53 +37,6 @@ class PenaltyMethod:
         else:
             ValueError("s should be a list, int, or float.") 
 
-
-
-        if self.model.type == "linear_signed":
-                for i in range(int(T)):
-                    self.vprint(f'\nDagma iter t={i+1} -- mu: {mu}', 30*'-')
-                    lr_adam, success = lr, False
-                    s_cur = s[i]
-                    inner_iters = int(max_iter) if i == T - 1 else int(warm_iter)
-                
-                    self.cov = X.T @ X / float(self.n)    
-                    self.W_est = np.zeros((self.d,self.d)).astype(self.dtype)
-                    while success is False:
-                        W_temp, success = self.minimize(self.W_est.copy(), mu, inner_iters, s_cur, lr=lr_adam)
-                        if success is False:
-                            self.vprint(f'Retrying with larger s')
-                            lr_adam  *= 0.5
-                            s_cur += 0.1
-                self.W_est = W_temp
-                mu *= mu_factor
-                self.W_est[np.abs(self.W_est) < w_threshold] = 0
-                return self.W_est
-        elif self.model.type == "mlp_signed":
-            for i in range(int(T)):
-                self.vprint(f'\nDagma iter t={i+1} -- mu: {mu}', 30*'-')
-                lr_adam, success = lr, False
-                s_cur = s[i]
-                inner_iters = int(max_iter) if i == T - 1 else int(warm_iter)
-                model_copy = copy.deepcopy(model)
-                lr_decay = False
-
-                while success is False:
-                        _, success = self.minimize(model, X, inner_iters, lambda1, lambda2, mu, s_cur, 
-                                                lr_decay,lr = lr_adam, checkpoint=checkpoint, verbose=verbose)
-                        if success is False:
-                            model.load_state_dict(model_copy.state_dict().copy())
-                            lr_adam  *= 0.5 
-                            lr_decay = True
-                            if lr_adam  < 1e-10:
-                                break # lr is too small
-                            s_cur = 1
-            self.W_est = self.model.adj()
-            mu *= mu_factor
-            self.W_est[np.abs(self.W_est) < w_threshold] = 0
-            return self.W_est 
-
-
-        """ 
         ## START DAGMA
         for i in range(int(T)):
             self.vprint(f'\nDagma iter t={i+1} -- mu: {mu}', 30*'-')
@@ -92,7 +48,8 @@ class PenaltyMethod:
 
             if self.model.type == "linear_signed":
                 self.cov = X.T @ X / float(self.n)    
-                self.W_est = np.zeros((self.d,self.d)).astype(self.dtype)
+                #self.W_est = np.zeros((self.d,self.d)).astype(self.dtype)
+                self.W_est = torch.zeros((self.d,self.d))
                 while success is False:
                     W_temp, success = self.minimize(self.W_est.copy(), mu, inner_iters, s_cur, lr=lr_adam)
                     if success is False:
@@ -114,23 +71,17 @@ class PenaltyMethod:
                         if lr_adam  < 1e-10:
                             break # lr is too small
                         s_cur = 1
-                self.W_est = self.model.adj()
+                self.W_est = model.adj()
                 mu *= mu_factor
        
         self.W_est[np.abs(self.W_est) < w_threshold] = 0
- 
         return self.W_est 
-        """
-    
-        
-
 
 
     def minimize(self, W, max_iter, lr, lambda1, lambda2, mu, s, lr_decay=False, checkpoint=1000, tol=1e-6, verbose=False):
         """ single unconstrained problem """
         self.vprint = print if verbose else lambda *a, **k: None
         self.vprint(f'\n\nMinimize with -- mu:{mu} -- lr: {lr} -- s: {s} -- l1: {self.lambda1} for {max_iter} max iterations')
-        # optimizer = optim.Adam(self.model.parameters(), lr=lr, betas=(.99,.999), weight_decay=mu*lambda2)
 
         if lr_decay is True:
             scheduler = optim.lr_scheduler.ExponentialLR(self.optimizers, gamma=0.8)
@@ -138,11 +89,12 @@ class PenaltyMethod:
 
         for i in range(max_iter):
             self.optimizers.zero_grad()
-            h_val = self.model.h_func(s)
+            h_val = self.h_func()
             if h_val.item() < 0:
                 self.vprint(f'Found h negative {h_val.item()} at iter {i}')
                 return False
             score = self.loss
+
             if self.model.type == "mlp_signed":
                 l1_reg = lambda1 * self.model.fc1_l1_reg() 
                 l2_reg = lambda2 * self.model.fc1_l2_reg()
@@ -155,7 +107,7 @@ class PenaltyMethod:
                         return W, False
                 l1_norm = sum([p.abs().sum() for p in self.model.parameters()])
                 l2_norm = sum([(p**2).sum() for p in self.model.parameters()])
-                obj = mu*(self.loss + lambda1*l1_norm + lambda2*l2_norm) + h_val    
+                obj = mu*(score + lambda1*l1_norm + lambda2*l2_norm) + h_val    
             obj.backward()
             self.optimizers.step()
             if lr_decay and (i+1) % 1000 == 0: #every 1000 iters reduce lr
@@ -168,4 +120,4 @@ class PenaltyMethod:
                 if np.abs((obj_prev - obj_new) / obj_prev) <= tol:
                     break
                 obj_prev = obj_new
-        return W, True
+        return True

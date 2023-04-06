@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-import torch.nn as nn
 import models
 import scores
 import dag_function
@@ -10,6 +9,7 @@ from lbfgsb_scipy import LBFGSBScipy
 from  torch import optim
 
 ### in the demo.py
+
 ## nonlinear example
 
 torch.set_default_dtype(torch.double)
@@ -20,7 +20,10 @@ torch.manual_seed(1)
 # mlp example
 n, d, s0, graph_type, sem_type = 1000, 20, 20, 'ER', 'mlp'
 B_true = utils.simulate_dag(d, s0, graph_type)
+print(type(B_true))
 X = utils.simulate_nonlinear_sem(B_true, n, sem_type)
+np.savetxt('X.csv', X, delimiter=',')
+print(type(X))
 
 #model
 #model = models.mlp_unsigned(dims=[d, 10, 1], bias=True, dtype=torch.float6)
@@ -42,8 +45,27 @@ optimizers = optim.Adam(model.parameters(), betas=(.99,.999))
 #algorithm
 algo = algorithms.PenaltyMethod(model, loss, h_func, optimizers)
 W_est = algo.fit(model, X_torch, lambda1=0.02, lambda2=0.005)
+np.savetxt('W_est.csv', W_est, delimiter=',')
+#print(W_est!=0)
 acc = utils.count_accuracy(B_true, W_est != 0)
 print(acc)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 """ 
 # notears example
@@ -72,8 +94,6 @@ acc = utils.count_accuracy(B_true, W_est != 0)
 print(acc)
 
 """
-
-
 
 """ 
 #torch.autograd.set_detect_anomaly(True)

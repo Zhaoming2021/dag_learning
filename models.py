@@ -13,6 +13,7 @@ class mlp_signed(nn.Module):
         self.dims, self.d = dims, dims[0]
         self.I = torch.eye(self.d,dtype=torch.float)
         self.dtype = dtype
+        #self.model_type = model_type
         #self.Id = torch.eye(self.d, dtype=torch.float)
         self.fc1 = nn.Linear(self.d, self.d * dims[1], bias=bias)
         nn.init.zeros_(self.fc1.weight)
