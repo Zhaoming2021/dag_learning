@@ -31,7 +31,7 @@ model = models.mlp_signed(dims=[d, 10, 1], bias=True, dtype=torch.float64)
 
 # dag function
 h = dag_function.dagma(model) 
-h_func = h.eval(s=1.0)
+h_func = h.eval(s=0.9)
 print(f'h_func',h_func)
 
 X_torch = torch.from_numpy(X)
@@ -44,7 +44,7 @@ optimizers = optim.Adam(model.parameters(), betas=(.99,.999))
 
 #algorithm
 algo = algorithms.PenaltyMethod(model, loss, h_func, optimizers)
-W_est = algo.fit(model, X_torch, lambda1=0.02, lambda2=0.005)
+W_est = algo.fit(model, X_torch, lambda1=0.07, lambda2=0.005)
 np.savetxt('W_est.csv', W_est, delimiter=',')
 #print(W_est!=0)
 acc = utils.count_accuracy(B_true, W_est != 0)

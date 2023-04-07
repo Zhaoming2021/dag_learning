@@ -49,14 +49,14 @@ class PenaltyMethod:
             if self.model.type == "linear_signed":
                 self.cov = X.T @ X / float(self.n)    
                 #self.W_est = np.zeros((self.d,self.d)).astype(self.dtype)
-                self.W_est = torch.zeros((self.d,self.d))
+                W_est = torch.zeros((self.d,self.d))
                 while success is False:
-                    W_temp, success = self.minimize(self.W_est.copy(), mu, inner_iters, s_cur, lr=lr_adam)
+                    W_temp, success = self.minimize(W_est.copy(), mu, inner_iters, s_cur, lr=lr_adam)
                     if success is False:
                         self.vprint(f'Retrying with larger s')
                         lr_adam  *= 0.5
                         s_cur += 0.1
-                self.W_est = W_temp
+                W_est = W_temp
                 mu *= mu_factor
             
             elif self.model.type == "mlp_signed":
@@ -71,11 +71,12 @@ class PenaltyMethod:
                         if lr_adam  < 1e-10:
                             break # lr is too small
                         s_cur = 1
-                self.W_est = model.adj()
-                mu *= mu_factor
+                    mu *= mu_factor
+            W_est = model.adj()
+            
        
-        self.W_est[np.abs(self.W_est) < w_threshold] = 0
-        return self.W_est 
+        W_est[np.abs(W_est) < w_threshold] = 0
+        return W_est 
 
 
     def minimize(self, W, max_iter, lr, lambda1, lambda2, mu, s, lr_decay=False, checkpoint=1000, tol=1e-6, verbose=False):
