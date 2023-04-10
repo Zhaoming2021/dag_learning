@@ -13,7 +13,6 @@ class mlp_signed(nn.Module):
         self.dims, self.d = dims, dims[0]
         self.I = torch.eye(self.d,dtype=torch.float)
         self.dtype = dtype
-        #self.model_type = model_type
         #self.Id = torch.eye(self.d, dtype=torch.float)
         self.fc1 = nn.Linear(self.d, self.d * dims[1], bias=bias)
         nn.init.zeros_(self.fc1.weight)
@@ -33,13 +32,19 @@ class mlp_signed(nn.Module):
         x = x.squeeze(dim=2)
         return x
 
-    def fc1_l1_reg(self):
+    def l1_loss(self):
         """Take l1 norm of fc1 weight"""
-        return torch.sum(torch.abs(self.fc1.weight))
+        reg = torch.sum(torch.abs(self.fc1.weight))
+        return reg
+
     
-    def fc1_l2_reg(self):
-        """Take l2 norm of fc1 weight"""
-        return torch.sqrt(torch.sum(torch.pow(self.fc1.weight, 2)))
+    def l2_loss(self):
+        """Take 2-norm-squared of all parameters"""
+        reg = 0.
+        reg += torch.sum(self.fc1.weight ** 2)
+        for fc in self.fc2:
+            reg += torch.sum(fc.weight ** 2)
+        return reg
 
     @torch.no_grad()
     def adj(self) -> np.ndarray:  # [j * m1, i] -> [i, j]
@@ -58,15 +63,55 @@ class linear_signed:
         torch.set_default_dtype(torch.double)
         self.dtype = dtype
         self.d = d
+        self.I = torch.eye(d, dtype=torch.float)
         self.vprint = print if verbose else lambda *a, **k: None
         self.W = torch.zeros((d,d))
-        #self.W = np.zeros((self.d,self.d)).astype(self.dtype)
+    
+    def l1_loss(self):
+        """Take l1 norm """
+        reg = torch.sum(torch.abs(self.W))
+        #reg = sum([p.abs().sum() for p in self.model.parameters()])
+        return reg
 
+    
+    def l2_loss(self):
+        reg = torch.sum(self.W**2)
+        return reg
+    
+
+    @torch.no_grad()
     def adj(self):
 
-        self.W = self.W
+        W = self.W
 
-        return self.W 
+        return W 
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   
 class mlp_unsigned(nn.Module):
     # notears nolinear
@@ -110,7 +155,12 @@ class mlp_unsigned(nn.Module):
         x = x.squeeze(dim=2)  # [n, d]
         return x
     
-    def l2_reg(self):
+    def l1_loss(self):
+        """Take l1 norm of fc1 weight"""
+        reg = torch.sum(self.fc1_pos.weight + self.fc1_neg.weight)
+        return reg
+    
+    def l2_loss(self):
         """Take 2-norm-squared of all parameters"""
         reg = 0.
         fc1_weight = self.fc1_pos.weight - self.fc1_neg.weight  # [j * m1, i]
@@ -118,15 +168,7 @@ class mlp_unsigned(nn.Module):
         for fc in self.fc2:
             reg += torch.sum(fc.weight ** 2)
         return reg
-
-    def fc1_l1_reg(self):
-        """Take l1 norm of fc1 weight"""
-        reg = torch.sum(self.fc1_pos.weight + self.fc1_neg.weight)
-        return reg
-    
-    def fc1_l2_reg(self):
-        """Take l2 norm of fc1 weight"""
-        return torch.sqrt(torch.sum(torch.pow(self.fc1.weight, 2)))
+ 
 
     @torch.no_grad()
     def adj(self) -> np.ndarray:  # [j * m1, i] -> [i, j]
@@ -152,6 +194,14 @@ class linear_unsigned:
     def adj(self):
         """Convert doubled variables ([2 d^2] array) back to original variables ([d, d] matrix)."""
         return (self.w[:self.d * self.d] - self.w[self.d * self.d:]).reshape([self.d, self.d])
+    
+    def l1_loss(self):
+        reg = torch.sum(torch.abs(self.W))
+        return reg
+    
+    def l2_loss(self):
+        reg = torch.sum(self.W**2)
+        return reg
     
 """ 
 model = linear_signed(d=10)

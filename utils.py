@@ -50,6 +50,8 @@ def simulate_dag(d, s0, graph_type):
         top = int(0.2 * d)
         G = ig.Graph.Random_Bipartite(top, d - top, m=s0, directed=True, neimode=ig.OUT)
         B = _graph_to_adjmat(G)
+    elif graph_type == 'Fully':
+        B = np.triu(np.ones((d,d)), 1)
     else:
         raise ValueError('unknown graph type')
     B_perm = _random_permutation(B)
