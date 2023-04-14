@@ -6,7 +6,6 @@ import numpy as np
 from  torch import optim
 import copy
 import torch
-from tqdm.auto import tqdm
 
 class PenaltyMethod:
 
@@ -49,14 +48,14 @@ class PenaltyMethod:
             self.vprint(f'\nDagma iter t={i+1} -- mu: {mu}', 30*'-')
             success, s_cur = False, s[i]
             inner_iters = int(max_iter) if i == T - 1 else int(warm_iter)
-            model_copy = copy.deepcopy(self.model)
+            #model_copy = copy.deepcopy(self.model)
             lr_decay = False
             while success is False:
-                success = self.minimize(X, lr, inner_iters, lambda1, lambda2, mu, s_cur, 
-                                   lr_decay, checkpoint=checkpoint, verbose=verbose)
-                #W_temp, success = self.minimize(W_est.clone(),lr, inner_iters, lambda1, lambda2, mu, s_cur,lr_decay)
+                #success = self.minimize(X, lr, inner_iters, lambda1, lambda2, mu, s_cur, 
+                                   #lr_decay, checkpoint=checkpoint, verbose=verbose)
+                success = self.minimize(W_est.clone(),lr, inner_iters, lambda1, lambda2, mu, s_cur,lr_decay)
                 if success is False:
-                        self.model.load_state_dict(model_copy.state_dict().copy())
+                        #self.model.load_state_dict(model_copy.state_dict().copy()) nonlinear
                         self.vprint(f'Retrying with larger s')
                         lr  *= 0.5
                         lr_decay = True
@@ -67,8 +66,9 @@ class PenaltyMethod:
             #W_est = W_temp
             mu *= mu_factor
         
-        W_est = self.model.adj()
-        W_est[np.abs(W_est) < w_threshold] = 0
+        #W_est = self.model.adj()
+        #W_est[np.abs(W_est) < w_threshold] = 0
+        W_est.detach().numpy()[np.abs(W_est.detach().numpy()) < w_threshold] = 0
         return W_est
     
     def minimize(self, X, lr, max_iter, lambda1, lambda2, mu, s, lr_decay=False, checkpoint=1000, tol=1e-6, verbose=False):
@@ -85,7 +85,8 @@ class PenaltyMethod:
             if h_val.item() < 0:
                 self.vprint(f'Found h negative {h_val.item()} at iter {i}')
                 return False 
-            X_hat = self.model(X)
+            #X_hat = self.model(X) #nonlinear
+            X_hat = self.model.forward(X) #linear
             score = self.loss(X_hat, X)
             l1_reg = lambda1 * self.model.l1_loss()
             l2_reg = lambda2 * self.model.l2_loss()

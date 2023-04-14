@@ -13,13 +13,17 @@ def log_mse_loss(output, target):
 
 def logistic_loss(output, target):
     
-    loss = 1.0 / output.shape[0] * (torch.logaddexp(torch.tensor(0.), target) - target * output).sum()
+    #loss = 1.0 / output.shape[0] * (torch.logaddexp(torch.tensor(0.), target) - target * output).sum()
+    loss = 1.0 / target.shape[0] * (torch.logaddexp(torch.tensor(0.), output) - target * output).sum()
+
 
     return loss
 
 def poisson_loss(output, target):
 
-    S = torch.exp(target)
-    loss = 1.0 / output.shape[0] * (S - output * target).sum()
+    S = torch.exp(output)
+    #S = torch.exp(target)
+    #loss = 1.0 / output.shape[0] * (S - output * target).sum()
+    loss = 1.0 / target.shape[0] * (S - output * target).sum()
 
     return loss

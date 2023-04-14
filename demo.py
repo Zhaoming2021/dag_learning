@@ -10,17 +10,17 @@ from  torch import optim
 ### in the demo.py
 
 
-## nonlinear example
+""" ## nonlinear example
 
 torch.set_default_dtype(torch.double)
 utils.set_random_seed(1)
 torch.manual_seed(1)
 
 # mlp example
-n, d, s0, graph_type, sem_type = 1000, 20, 20, 'ER', 'mlp'
+n, d, s0, graph_type, sem_type = 10, 20, 20, 'ER', 'mlp'
 B_true = utils.simulate_dag(d, s0, graph_type)
 X = utils.simulate_nonlinear_sem(B_true, n, sem_type)
-#np.savetxt('X.csv', X, delimiter=',')
+np.savetxt('X.csv', X, delimiter=',')
 
 #model
 #model = models.mlp_unsigned(dims=[d, 10, 1], bias=True, dtype=torch.float6)
@@ -29,7 +29,7 @@ model = models.mlp_signed(dims=[d, 10, 1], bias=True, dtype=torch.float64) #try 
 h = dag_function.dagma(model)
 X_torch = torch.from_numpy(X)
 #loss
-loss = scores.logistic_loss
+loss = scores.log_mse_loss
 #optimizers 
 optimizer = optim.Adam(model.parameters(), betas=(.99,.999))
 #algorithm
@@ -38,10 +38,10 @@ W_est = algo.fit(X_torch, lambda1=0.002, lambda2=0.005)
 np.savetxt('W_est.csv', W_est, delimiter=',')
 acc = utils.count_accuracy(B_true, W_est != 0)
 print(acc) 
+ """
 
 
-
-""" # linear example
+# linear example
 n, d, s0, graph_type, sem_type = 100, 20, 20, 'ER', 'gauss'
 B_true = utils.simulate_dag(d, s0, graph_type)
 W_true = utils.simulate_parameter(B_true)
@@ -57,15 +57,18 @@ h = dag_function.dagma(model)
 loss= scores.logistic_loss
 # optimizers
 #optimizer = LBFGSBScipy(model.parameters())
+
 params = [v for k, v in model.__dict__.items() if isinstance(v, torch.Tensor)]
 params_tensor = torch.cat(params, dim=0)
 params_list = torch.split(params_tensor, split_size_or_sections=len(params))
-optimizer = optim.Adam(params_list, betas=(.99,.999)) # don't need to have weight decay here just add l2 loss in the objective
+params_list_detached = tuple(p.detach() for p in params_list)
+optimizer = optim.Adam(params_list_detached, betas=(.99, .999)) # don't need to have weight decay here just add l2 loss in the objective
+
 
 algo = algorithms.PenaltyMethod(model, loss, h, optimizer)
 W_est = algo.fit(X_torch, lambda1=0.02)
 acc = utils.count_accuracy(B_true, W_est != 0)
-print(acc) """
+print(acc) 
 
 
 """ 

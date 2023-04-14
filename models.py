@@ -65,7 +65,15 @@ class linear_signed:
         self.d = d
         self.I = torch.eye(d, dtype=torch.float)
         self.vprint = print if verbose else lambda *a, **k: None
-        self.W = torch.zeros((d,d))
+        self.W = torch.zeros((d,d),requires_grad=True)
+
+
+    def forward(self, x):
+ 
+        x = torch.matmul(x, self.W)
+
+        return x
+
     
     def l1_loss(self):
         """Take l1 norm """
@@ -75,44 +83,18 @@ class linear_signed:
 
     
     def l2_loss(self):
-        reg = torch.sum(self.W**2)
+        reg = torch.sum((self.W)**2)
         return reg
     
-
     @torch.no_grad()
     def adj(self):
-
         W = self.W
+       # W = W.cpu().detach().numpy()
 
         return W 
     
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  
 class mlp_unsigned(nn.Module):
     # notears nolinear
     def __init__(self, dims, bias=True):
@@ -168,7 +150,6 @@ class mlp_unsigned(nn.Module):
         for fc in self.fc2:
             reg += torch.sum(fc.weight ** 2)
         return reg
- 
 
     @torch.no_grad()
     def adj(self) -> np.ndarray:  # [j * m1, i] -> [i, j]
@@ -191,6 +172,12 @@ class linear_unsigned:
         self.vprint = print if verbose else lambda *a, **k: None
         self.w = torch.zeros(2 * d * d)
 
+    def forward(self, x):
+
+        x = torch.matmul(x, self.W)
+
+        return x
+
     def adj(self):
         """Convert doubled variables ([2 d^2] array) back to original variables ([d, d] matrix)."""
         return (self.w[:self.d * self.d] - self.w[self.d * self.d:]).reshape([self.d, self.d])
@@ -200,7 +187,7 @@ class linear_unsigned:
         return reg
     
     def l2_loss(self):
-        reg = torch.sum(self.W**2)
+        reg = torch.sum((self.W)**2)
         return reg
     
 """ 
