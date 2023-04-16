@@ -10,7 +10,7 @@ from  torch import optim
 ### in the demo.py
 
 
-""" ## nonlinear example
+## nonlinear example
 
 torch.set_default_dtype(torch.double)
 utils.set_random_seed(1)
@@ -23,7 +23,7 @@ X = utils.simulate_nonlinear_sem(B_true, n, sem_type)
 np.savetxt('X.csv', X, delimiter=',')
 
 #model
-#model = models.mlp_unsigned(dims=[d, 10, 1], bias=True, dtype=torch.float6)
+#model = models.mlp_unsigned(dims=[d, 10, 1], bias=True, dtype=torch.float64)
 model = models.mlp_signed(dims=[d, 10, 1], bias=True, dtype=torch.float64) #try linear 
 # dag function
 h = dag_function.dagma(model)
@@ -35,12 +35,13 @@ optimizer = optim.Adam(model.parameters(), betas=(.99,.999))
 #algorithm
 algo = algorithms.PenaltyMethod(model, loss, h, optimizer)
 W_est = algo.fit(X_torch, lambda1=0.002, lambda2=0.005)
+print(utils.is_dag(W_est))
 np.savetxt('W_est.csv', W_est, delimiter=',')
 acc = utils.count_accuracy(B_true, W_est != 0)
 print(acc) 
- """
 
 
+""" 
 # linear example
 n, d, s0, graph_type, sem_type = 100, 20, 20, 'ER', 'gauss'
 B_true = utils.simulate_dag(d, s0, graph_type)
@@ -68,7 +69,7 @@ optimizer = optim.Adam(params_list_detached, betas=(.99, .999)) # don't need to 
 algo = algorithms.PenaltyMethod(model, loss, h, optimizer)
 W_est = algo.fit(X_torch, lambda1=0.02)
 acc = utils.count_accuracy(B_true, W_est != 0)
-print(acc) 
+print(acc)  """
 
 
 """ 

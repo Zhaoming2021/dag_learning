@@ -16,7 +16,7 @@ class PenaltyMethod:
         self.optimizer = optimizer
     
     def fit(self, X: torch.tensor, lambda1= .02, lambda2 = .005,
-        T=4, mu_init=1, mu_factor=.1, s=[1.0, .9, .8, .7, .6], warm_iter=5e4, max_iter=8e4, lr=.0002, 
+        T=4, mu_init=1, mu_factor=.1, s=1.0, warm_iter=5e4, max_iter=8e4, lr=.0002, 
         w_threshold=0.3, checkpoint=1000, verbose=False):
         """ the standard machinery of augmented Lagrangian, resulting in a series of unconstrained problems""" 
         if type(X) is not torch.Tensor:
@@ -28,11 +28,10 @@ class PenaltyMethod:
         self.Id = torch.eye(self.d, dtype=torch.float)
 
         mu = mu_init
-        
-        W_est = self.model.adj()
-        #W_est = torch.eye(self.d, dtype=torch.float) # init W0 at zero matrix
+        #W_est = self.model.adj()
+        #W_est = torch.zeros((self.d,self.d), dtype=torch.float) # init W0 at zero matrix   LINEAR USE
         mu = mu_init
-
+        
         if type(s) == list:
             if len(s) < T: 
                 self.vprint(f"Length of s is {len(s)}, using last value in s for iteration t >= {len(s)}")
@@ -48,27 +47,25 @@ class PenaltyMethod:
             self.vprint(f'\nDagma iter t={i+1} -- mu: {mu}', 30*'-')
             success, s_cur = False, s[i]
             inner_iters = int(max_iter) if i == T - 1 else int(warm_iter)
-            #model_copy = copy.deepcopy(self.model)
+            model_copy = copy.deepcopy(self.model)
             lr_decay = False
             while success is False:
-                #success = self.minimize(X, lr, inner_iters, lambda1, lambda2, mu, s_cur, 
-                                   #lr_decay, checkpoint=checkpoint, verbose=verbose)
-                success = self.minimize(W_est.clone(),lr, inner_iters, lambda1, lambda2, mu, s_cur,lr_decay)
+                success = self.minimize(X, lr, inner_iters, lambda1, lambda2, mu, s_cur, 
+                                   lr_decay, checkpoint=checkpoint, verbose=verbose)
+                #success = self.minimize(W_est.clone(),lr, inner_iters, lambda1, lambda2, mu, s_cur,lr_decay)
                 if success is False:
-                        #self.model.load_state_dict(model_copy.state_dict().copy()) nonlinear
-                        self.vprint(f'Retrying with larger s')
+                        self.model.load_state_dict(model_copy.state_dict().copy()) # nonlinear
+                        #self.vprint(f'Retrying with larger s')
                         lr  *= 0.5
                         lr_decay = True
                         if lr < 1e-10:
                             break # lr is too small
                         s_cur += 0.1
-                        #s_cur = 1
             #W_est = W_temp
-            mu *= mu_factor
-        
-        #W_est = self.model.adj()
-        #W_est[np.abs(W_est) < w_threshold] = 0
-        W_est.detach().numpy()[np.abs(W_est.detach().numpy()) < w_threshold] = 0
+            mu *= mu_factor   
+        W_est = self.model.adj()
+        W_est[np.abs(W_est) < w_threshold] = 0 #nonlinear
+        #W_est.detach().numpy()[np.abs(W_est.detach().numpy()) < w_threshold] = 0 #linear
         return W_est
     
     def minimize(self, X, lr, max_iter, lambda1, lambda2, mu, s, lr_decay=False, checkpoint=1000, tol=1e-6, verbose=False):
@@ -85,8 +82,8 @@ class PenaltyMethod:
             if h_val.item() < 0:
                 self.vprint(f'Found h negative {h_val.item()} at iter {i}')
                 return False 
-            #X_hat = self.model(X) #nonlinear
-            X_hat = self.model.forward(X) #linear
+            X_hat = self.model(X) #nonlinear
+            #X_hat = self.model.forward(X) #linear
             score = self.loss(X_hat, X)
             l1_reg = lambda1 * self.model.l1_loss()
             l2_reg = lambda2 * self.model.l2_loss()
