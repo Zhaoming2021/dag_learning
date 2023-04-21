@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 class dagma:
   
@@ -6,11 +7,9 @@ class dagma:
     self.model = model
     
   def eval(self, s=1.0):
-      s = torch.tensor(s, dtype=torch.float64)
       W = self.model.adj()
       M = s * self.model.I - W*W
-      #M = s * torch.eye(self.model.d) - W*W    # in numpy : s * self.Id - W * W
-      h = - torch.slogdet(M)[1] + self.model.d * torch.log(s)
+      h = - torch.slogdet(M)[1] + self.model.d * np.log(s)
       return h 
 
 class notears:
