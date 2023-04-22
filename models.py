@@ -4,14 +4,14 @@ import torch.nn as nn
 import numpy as np
 
 class mlp_signed(nn.Module):
-    # dagma nonlinear
+
     def __init__(self, dims, bias=True, dtype=torch.double):
         super(mlp_signed, self).__init__()
         torch.set_default_dtype(torch.double)
         assert len(dims) >= 2
         assert dims[-1] == 1
         self.dims, self.d = dims, dims[0]
-        self.I = torch.eye(self.d)
+        self.I = torch.eye(self.d,dtype=dtype)
         self.dtype = dtype
         self.fc1 = nn.Linear(self.d, self.d * dims[1], bias=bias)
         nn.init.zeros_(self.fc1.weight)
@@ -30,35 +30,27 @@ class mlp_signed(nn.Module):
             x = fc(x)
         x = x.squeeze(dim=2)
         return x
-    
-    def l2_reg(self):
-        """Take 2-norm-squared of all parameters"""
-        reg = 0.
-        reg += torch.sum(self.fc1.weight ** 2)
-        for fc in self.fc2:
-            reg += torch.sum(fc.weight ** 2)
-        return reg
 
     def l1_loss(self):
         """Take l1 norm of fc1 weight"""
         return torch.sum(torch.abs(self.fc1.weight))
     
     def l2_loss(self):
-        """Take L2 norm of all parameters"""
-        l2_reg = 0.0
-        for param in self.parameters():
-            l2_reg += torch.norm(param)
-        return l2_reg
+        """Take 2-norm-squared of all parameters"""
+        reg = 0.
+        reg += torch.sum(self.fc1.weight ** 2)
+        for fc in self.fc2:
+            reg += torch.sum(fc.weight ** 2)
+        return reg
     
     @torch.no_grad()
-    def adj(self):  # [j * m1, i] -> [i, j]
+    def adj(self):
         """Get W from fc1 weights, take 2-norm over m1 dim"""
         fc1_weight = self.fc1.weight
         fc1_weight = fc1_weight.view(self.d, -1, self.d)  
         A = torch.sum(fc1_weight ** 2, dim=1).t() 
         W = torch.sqrt(A)
         return W
-
 
 class linear_signed(nn.Module):
     def __init__(self, d, verbose=False, dtype=torch.double):
@@ -142,14 +134,13 @@ class mlp_unsigned(nn.Module):
     @torch.no_grad()
     def adj(self) -> np.ndarray:  # [j * m1, i] -> [i, j]
         """Get W from fc1 weights, take 2-norm over m1 dim"""
-        d = self.dims[0]
+        d = self.d
         fc1_weight = self.fc1_pos.weight - self.fc1_neg.weight  # [j * m1, i]
         fc1_weight = fc1_weight.view(d, -1, d)  # [j, m1, i]
         A = torch.sum(fc1_weight * fc1_weight, dim=1).t()  # [i, j]
         W = torch.sqrt(A)  # [i, j]
-        W = W.cpu().detach().numpy()  # [i, j]
+        #W = W.cpu().detach().numpy()  # [i, j] # 
         return W
-
 
 class linear_unsigned(nn.Module):
 
@@ -158,12 +149,11 @@ class linear_unsigned(nn.Module):
         torch.set_default_dtype(dtype)
         self.dtype = dtype
         self.d = d
-        self.vprint = print if verbose else lambda *a, **k: None
-        self.w = torch.zeros(2 * d * d)
+        self.W = nn.Linear(d,d, bias=False, dtype=dtype)
+        self.w = nn.Parameter(torch.zeros(2 * d * d))
 
     def forward(self, x):
-        x = torch.matmul(x, self.W)
-        return x
+        return self.W(x)
     
     def l1_loss(self):
         return torch.norm(self.W.weight, p=1)
